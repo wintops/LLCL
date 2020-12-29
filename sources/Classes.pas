@@ -2022,7 +2022,7 @@ begin
   inherited Create;
   fSuspended := CreateSuspended;
   fCreateSuspended := CreateSuspended;
-  fHandle := BeginThread(nil, 0, TThreadFunc(@ThreadProc), Pointer(self), CREATE_SUSPENDED, fThreadID);
+ // fHandle := BeginThread(nil, 0, TThreadFunc(@ThreadProc), Pointer(self), CREATE_SUSPENDED, fThreadID);
   if fHandle = 0 then
     raise Exception.Create({$ifdef Def_FPC_StdSys}ansistring{$else}string{$endif}(SysErrorMessage(LLCL_GetLastError())));
   LLCL_SetThreadPriority(fHandle, THREAD_PRIORITY_NORMAL);
