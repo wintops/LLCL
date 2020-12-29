@@ -472,6 +472,11 @@ begin
         bsSizeable: begin
           fAdjWidth := (iBorderWidth-SizeAdj[1])*8;
           fAdjHeight := iCaptionHeight+(iBorderWidth-SizeAdj[1])*9-SizeAdj[2];
+
+          {$IFNDEF FPC}
+          Width := fClientWidth + fAdjWidth;
+          Height := fClientHeight + fAdjHeight;
+{$ENDIF FPC}
         end;
 {$IFNDEF FPC}
        else begin
