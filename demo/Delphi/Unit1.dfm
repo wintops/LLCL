@@ -1,26 +1,26 @@
 object Form1: TForm1
   Left = 198
   Top = 114
-  Width = 416
-  Height = 595
   Caption = 'LLCL - Just testing...'
+  ClientHeight = 536
+  ClientWidth = 400
   Color = clBtnFace
-  Font.Charset = DEFAULT_CHARSET
+
   Font.Color = clWindowText
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   KeyPreview = True
-  Menu = MainMenu1
-  OldCreateOrder = False
+
+
   OnCreate = FormCreate
   OnKeyDown = FormKeyDown
   OnKeyPress = FormKeyPress
   OnKeyUp = FormKeyUp
   OnMouseDown = FormMouseDown
   OnMouseUp = FormMouseUp
-  PixelsPerInch = 96
-  TextHeight = 13
+
+
   object Label1: TLabel
     Left = 8
     Top = 512
@@ -34,7 +34,7 @@ object Form1: TForm1
     Width = 129
     Height = 65
     Caption = '&GroupBox1'
-    Font.Charset = DEFAULT_CHARSET
+
     Font.Color = clWindowText
     Font.Height = -13
     Font.Name = 'MS Sans Serif'
@@ -47,7 +47,7 @@ object Form1: TForm1
       Width = 93
       Height = 17
       Caption = 'RadioButton1 '
-      Font.Charset = DEFAULT_CHARSET
+
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'MS Sans Serif'
@@ -63,7 +63,7 @@ object Form1: TForm1
       Alignment = taLeftJustify
       Caption = 'RadioButton2'
       Checked = True
-      Font.Charset = DEFAULT_CHARSET
+
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'MS Sans Serif'
@@ -78,12 +78,11 @@ object Form1: TForm1
     Top = 12
     Width = 133
     Height = 21
-    Font.Charset = DEFAULT_CHARSET
+
     Font.Color = clWindowText
     Font.Height = -11
     Font.Name = 'MS Sans Serif'
     Font.Style = [fsBold]
-    ItemHeight = 13
     ParentFont = False
     TabOrder = 0
     Text = 'sample text'
@@ -110,7 +109,7 @@ object Form1: TForm1
     Width = 75
     Height = 25
     Caption = '&Add'
-    Font.Charset = DEFAULT_CHARSET
+
     Font.Color = clWindowText
     Font.Height = -13
     Font.Name = 'MS Sans Serif'
@@ -133,12 +132,12 @@ object Form1: TForm1
     Top = 76
     Width = 217
     Height = 100
-    Font.Charset = DEFAULT_CHARSET
+
     Font.Color = clWindowText
     Font.Height = -11
     Font.Name = 'MS Sans Serif'
     Font.Style = [fsBold]
-    ItemHeight = 13
+
     Items.Strings = (
       '444'
       '111'
@@ -260,7 +259,6 @@ object Form1: TForm1
     Width = 25
     Height = 129
     Style = csSimple
-    ItemHeight = 13
     TabOrder = 8
     Text = '10'
     Items.Strings = (
@@ -322,10 +320,10 @@ object Form1: TForm1
   object Timer1: TTimer
     Enabled = False
     OnTimer = Timer1Timer
-    Left = 368
+
   end
   object MainMenu1: TMainMenu
-    Left = 336
+
     object MenuItem1: TMenuItem
       Caption = '&Menu1'
       object MenuItem3: TMenuItem
@@ -369,7 +367,7 @@ object Form1: TForm1
     end
   end
   object PopupMenu1: TPopupMenu
-    Left = 304
+
     object MenuItem9: TMenuItem
       Caption = 'Popup1'
       OnClick = MenuItem9Click
@@ -380,12 +378,12 @@ object Form1: TForm1
     end
   end
   object XPManifest1: TXPManifest
-    Left = 272
+
   end
   object SaveDialog1: TSaveDialog
-    Left = 240
+
   end
   object OpenDialog1: TOpenDialog
-    Left = 208
+
   end
 end
