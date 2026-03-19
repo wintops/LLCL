@@ -462,6 +462,7 @@ end;
 procedure TControl.ReadProperty(const PropName: string; Reader: TReader);
 const Properties: array[0..0] of PChar = ('OnClick');
 begin
+
   case StringIndex(PropName, Properties) of
     0 : TMethod(EOnClick) := FindMethod(Reader);
     else inherited;
@@ -471,17 +472,26 @@ end;
 function TControl.FindMethod(Reader: TReader): TMethod;
 var AComponent: TComponent;
     AName: shortstring;
+   // s:ansistring;
 begin
   if Reader.ReadValueType in [vaString, vaIdent] then begin
     AName := Reader.ReadShortString;
+    //s:=ansistring(Aname);
+    //Aname:=s;
+    //log(pchar(s));
     AComponent := self;
+ //   writeln(AName);
+
     while AComponent<>nil do begin
       result.Data := AComponent;
       result.Code := AComponent.MethodAddress(AName);
+    //  s:=aname;
+
       if result.Code<>nil then exit;
       AComponent := AComponent.Owner;
     end;
   end;
+
   raise EClassesError.Create(LLCL_STR_CTRL_METHOD);
 end;
 

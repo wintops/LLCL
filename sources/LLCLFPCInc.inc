@@ -18,7 +18,7 @@
 
 // Specific (i.e. not LCL standard) Ansi only option (no UTF8 at all)
 //   Can't be used with any Unicode mode ({$modeswitch unicodestrings} or {$mode delphiunicode})
-//  {$define LLCL_FPC_ANSI_ONLY}
+  {$define LLCL_FPC_ANSI_ONLY}
 {$IFDEF UNICODE} {$undef LLCL_FPC_ANSI_ONLY} {$ENDIF}
 
 {$else LLCL_FPC_MODESECTION}

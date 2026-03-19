@@ -486,6 +486,7 @@ var
 
 implementation
 
+
 {$IFDEF FPC}
   {$PUSH} {$HINTS OFF}
 {$ENDIF}
@@ -1313,7 +1314,7 @@ end;
 constructor TReader.Create(const ResourceName: string);
 var res: THandle;
 begin
-  res := LLCL_FindResource(hInstance, @ResourceName[1], PChar(RT_RCDATA));
+  res := LLCL_FindResource(hInstance, Pchar(ResourceName), PChar(RT_RCDATA));
   if res=0 then exit;
   fHandle := LLCL_LoadResource(hInstance,res);
   if fHandle=0 then exit;
@@ -1471,16 +1472,21 @@ end;
 procedure TReader.IdentProperty(var aValue; aTypeInfo: pointer);
 var ValueType: TValueType;
     V: cardinal;
+
+s:shortstring;
 begin
   ValueType := ReadValueType();
   if ValueType=vaIdent then begin
-     V := GetEnumNameValue(aTypeInfo, string(ReadShortString()));
+    s:=string(ReadShortString());
+     V := GetEnumNameValue(aTypeInfo, s);
      if V<=255 then begin
        byte(aValue) := V;
        exit;
      end;
   end;
-  Error(LLCL_STR_CLAS_IDENT);
+ // OutputDebugString(pchar(s));
+
+ // Error(LLCL_STR_CLAS_IDENT);
 end;
 
 procedure TReader.SetProperty(var ASet; aTypeInfo: pointer);
@@ -1521,16 +1527,46 @@ begin
 end;
 
 function TReader.ReadString(): string;
-var L: integer;
+var  L: integer;
 {$ifdef UNICODE}
-var S: ansistring;
+var i  : integer;
+  S:string;
 {$else}
-var S: string;
+var S: ansistring;
 {$endif}
 begin
   L := fPointer^;
-  System.SetString(S, PAnsiChar(fPointer)+1, L);
-  result := LLCLS_FormStringToString(S);
+
+
+
+  {$ifdef UNICODE}
+
+
+  setlength(Result,L);
+
+ // result[0]:=ansichar(L);
+ // setlength(result,L);
+  for i:=1 to L  do
+    begin
+
+  result[i]:=char(PAnsiChar(fPointer+i)^);
+
+    end;
+
+  // Result[L+1] := #0;
+
+
+  // OutputDebugString(pchar(result));
+
+
+
+{$else}
+System.SetString(S, PAnsiChar(fPointer)+1, L);
+ result := LLCLS_FormStringToString(S);
+{$endif}
+
+
+
   Inc(L);
   Inc(fPosition, L);
   Inc(fPointer, L);
@@ -1548,12 +1584,73 @@ begin
 end;
 
 function TReader.ReadShortString(): shortstring;
-var L: integer;
+var i,L: integer;
+//S:string;
 begin
+  {
+  MessageBoxA(0, PAnsiChar(
+  IntToHex(PByte(fPointer)^, 2) + ' ' +
+  IntToHex(PByte(fPointer+1)^, 2) + ' ' +
+  IntToHex(PByte(fPointer+2)^, 2) + ' ' +
+  IntToHex(PByte(fPointer+3)^, 2) + ' ' +
+  IntToHex(PByte(fPointer+4)^, 2) + ' ' +
+  IntToHex(PByte(fPointer+5)^, 2)
+ ), 'Debug', MB_OK);
+ }
+
   L := fPointer^+1;
-  move(fPointer^, result, L);
+ // ShowMessage(inttostr(L));
+
+
+ // move(fPointer^, result, L);
+
+
+ // result:=s;
+//  setlength(result,L);
+
+ // s:= ansistring(fPointer);
+
+   Result[0] := ansichar(L-1);
+ // setlength(s,L-1);
+
+ // result[0]:=ansichar(L);
+ // setlength(result,L);
+  for i:=1 to L-1  do
+    begin
+
+ // result[i]:=char(PChar(fPointer+i)^);
+ //        result[i] := PChar( fPointer + i )^ ;
+   result[i] := Char( PansiChar( NativeUInt(fPointer) + i )^ );
+    end;
+
+   Result[L] := #0;
+
+
+ // s[L]:=ansichar(#0);
+ {
+ // setlength(result,L);
+ // result:=ansistring(s);
+
+//  log(pansichar(s));
+ L:=Length(result);
+// log(pansichar( ansistring(inttostr(L))));
+ // s:=UTF8toAnsi(result);
+
+ setlength(s,0);
+ setlength(s,L-1);
+   for i:=0 to L-1  do
+    begin
+
+  s[i]:=result[i+1];
+    end;
+ }
+
+ //result:=s;
+ //MessageBoxA(0, @result[1], 'Debug', MB_OK);
+  //log(pansichar(s));
   Inc(fPosition, L);
   Inc(fPointer, L);
+
 end;
 
 function TReader.ReadUTF8String(): string;
@@ -1703,7 +1800,7 @@ begin
         else OutputDebugString(pointer(LLCL_STR_CLAS_BADVALUETYPE+{$ifdef Def_FPC_StdSys}Class_IntToStr{$else}IntToStr{$endif}(ord(ValueType))));
       end;
       Oem := LLCLS_StringToOem(Value);
-      writeln(self.ClassName+' '+TComponent(self).Name+'.'+PropName+'='+Oem);
+      OutputDebugString(pchar(self.ClassName+' '+TComponent(self).Name+'.'+PropName+'='+Oem));
 {$else}
       ValueType := ReadValueType();
       case ValueType of // no handler -> ignore this property

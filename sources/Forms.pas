@@ -399,16 +399,18 @@ begin
 end;
 
 procedure TCustomForm.ReadProperty(const PropName: string; Reader: TReader);
-const Properties: array[0..10] of PChar = (
+const Properties: array[0..12] of PChar = (
     'ClientWidth', 'ClientHeight',
     'BorderStyle',
     'Position',
     'WindowState',
     'OnCreate', 'OnPaint', 'OnResize', 'OnDestroy',
     'FormStyle',
-    'KeyPreview'
+    'KeyPreview',
+    'Width', 'Height'
   );
 begin
+ OutputDebugString(pchar(PropName));
   case StringIndex(PropName, Properties) of
     0 : fClientWidth := Reader.IntegerProperty;     // Used internaly
     1 : fClientHeight := Reader.IntegerProperty;    //   later (eventually)
@@ -421,6 +423,8 @@ begin
     8 : TMethod(EOnDestroy) := FindMethod(Reader);
     9 : Reader.IdentProperty(fFormStyle, TypeInfo(TFormStyle));
     10: fKeyPreview := Reader.BooleanProperty;
+        11 : fClientWidth := Reader.IntegerProperty;     // Used internaly
+    12 : fClientHeight := Reader.IntegerProperty;    //   later (eventually)
    else inherited;
   end;
 end;
@@ -464,7 +468,7 @@ begin
         bsSingle, bsDialog: begin
           fAdjWidth := (iBorderWidth-SizeAdj[0])*6;
           fAdjHeight := iCaptionHeight+(iBorderWidth-SizeAdj[0])*7;
-{$IFNDEF FPC}
+{$IFNDEF FPC1}
           Width := fClientWidth + fAdjWidth;
           Height := fClientHeight + fAdjHeight{$ifdef LLCL_OPT_USEMENUS} + fAdjMenu{$endif};
 {$ENDIF FPC}
@@ -472,13 +476,13 @@ begin
         bsSizeable: begin
           fAdjWidth := (iBorderWidth-SizeAdj[1])*8;
           fAdjHeight := iCaptionHeight+(iBorderWidth-SizeAdj[1])*9-SizeAdj[2];
-
-          {$IFNDEF FPC}
+   {$IFNDEF FPC1}
           Width := fClientWidth + fAdjWidth;
-          Height := fClientHeight + fAdjHeight;
+          Height := fClientHeight + fAdjHeight{$ifdef LLCL_OPT_USEMENUS} + fAdjMenu{$endif};
 {$ENDIF FPC}
+
         end;
-{$IFNDEF FPC}
+{$IFNDEF FPC1}
        else begin
          Width := fClientWidth;
          Height := fClientHeight;
@@ -517,7 +521,7 @@ begin
   cfStyle := cfStyle or WS_CLIPCHILDREN or WS_CLIPSIBLINGS;
   with Params do
     begin
-{$IFDEF FPC}
+{$IFNDEF FPC}
       Width := Width + fAdjWidth;
       Height := Height + fAdjHeight; // Menu already included
 {$ENDIF}
@@ -528,6 +532,8 @@ begin
       {$endif}
       WinClassName := TFORM_CLASS;
     end;
+
+     // OutputDebugString(PChar(Format('W=%d, H=%d', [Width, Height])));
 end;
 
 procedure TCustomForm.DoCreate;       // Create Form and all its Controls
@@ -766,10 +772,13 @@ begin
     fIcon.Handle := LLCL_LoadIcon(hInstance, PChar(IDI_APPLICATION));
   // Default title
   fTitle := LLCLS_GetModuleFileName(hInstance);
+
   i := RPos(PathDelim, fTitle);
   if i>0 then fTitle := Copy(fTitle, i+1, cardinal(length(fTitle))-i);
   i := RPos('.', fTitle);
   if i>0 then fTitle := Copy(fTitle, 1, i-1);
+
+  //  MessageBoxW(0, pchar(fTitle ), 'Debug', MB_OK);
   {$ifdef LLCL_OPT_TOPFORM}
   // "Top invisible" form
   CreateHandle();
@@ -858,7 +867,9 @@ begin
   ExStyle := 0;
   if (not fMainFormOnTaskBar) then
     ExStyle := ExStyle or WS_EX_APPWINDOW;
-  fHandle := LLCL_CreateWindowEx(ExStyle, TAPPL_CLASS, @fTitle[1], Style,
+
+ // MessageBoxW(0, pchar(fTitle ), 'Debug', MB_OK);
+  fHandle := LLCL_CreateWindowEx(ExStyle, TAPPL_CLASS, pchar(fTitle), Style,
     LLCL_GetSystemMetrics(SM_CXSCREEN) div 2, LLCL_GetSystemMetrics(SM_CYSCREEN) div 2,
     0, 0, 0, 0, WndClass.hInstance, nil);
   SystemMenu := LLCL_GetSystemMenu(fHandle, False);

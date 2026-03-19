@@ -1349,7 +1349,7 @@ begin
   Transparent := true;
   TabStop := false;
 {$IFNDEF FPC}
-  AutoSize := true;
+ // AutoSize := true;
 {$ENDIF}
 end;
 

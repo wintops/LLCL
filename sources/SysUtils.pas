@@ -1912,7 +1912,7 @@ var StartS, EndS: integer;
 begin
   EndS := length(S);
   StartS := 1;
-  while (StartS<=EndS) and (S[StartS] in [#0,' ']) do
+  while (StartS<=EndS) and (char(S[StartS]) in [#0,' ']) do
     Inc(StartS);
   if StartS>Ends then
     result := ''
@@ -3187,7 +3187,7 @@ var i: integer;
 begin
   i := LastDelimiter({$IFDEF LLCL_FPC_UNISYS}unicodestring{$ELSE}string{$ENDIF}(PathDelim{$ifndef Linux}+DriveDelim{$endif}), Filename);
   if (i>1) and (FileName[i]=PathDelim) and
-     (not (FileName[i-1] in [PathDelim{$ifndef Linux}, DriveDelim{$endif}])) then
+     (not (char(FileName[i-1]) in [PathDelim{$ifndef Linux}, DriveDelim{$endif}])) then
     Dec(i);
   result := Copy(FileName, 1, i);
 end;
