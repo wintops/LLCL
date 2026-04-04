@@ -484,7 +484,7 @@ const
 
  // function  log(lpszDst: LPCSTR): integer; stdcall; external CUSER32 name 'log';
 
- function Copy(S: string; Index: Integer; Count: Integer): string;
+// function Copy(S: string; Index: Integer; Count: Integer): string;
 
 function  GetVersionExW(var lpVersionInformation: TOSVersionInfoW): BOOL; stdcall; external CKERNEL32 name 'GetVersionExW';
 function  GetModuleHandleW(lpModuleName: LPCWSTR): HMODULE; stdcall; external CKERNEL32 name 'GetModuleHandleW';
@@ -5448,7 +5448,7 @@ begin
   Dest[iLen] := WideChar(0);
 end;
 
-
+ {
 function Copy(S: string; Index: Integer; Count: Integer): string;
 var
   I: Integer;
@@ -5458,6 +5458,7 @@ for I := index to index+count-1 do
   result[i-index+1]:=s[i];
 
 end;
+}
 //------------------------------------------------------------------------------
 
 {$IFDEF LLCL_FPC_UTF8RTL}     // (FPC only)

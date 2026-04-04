@@ -560,6 +560,145 @@ var OldErrorMode: cardinal;
 
 //------------------------------------------------------------------------------
 
+
+function Format(const sFormat: string; const Args: array of const): string;
+// supported: %% %s %d %x %.prec? %index:?
+var i, j, c, L: integer;
+    decim: string;
+    prec: Integer;
+    IntVal,IntPart:longint;
+    FracPart:integer;
+begin
+  if High(Args) < 0 then begin
+    Result := sFormat;
+    Exit;
+  end;
+  Result := '';
+  L := Length(sFormat);
+  if L = 0 then Exit;
+  i := 1;
+  c := 0;
+  while (i <= L) do begin
+    j := i;
+    while (i <= L) and (sFormat[i] <> '%') do Inc(i);
+    case i - j of
+      0: ;
+      1: Result := Result + sFormat[j];
+      else Result := Result + Copy(sFormat, j, i - j);
+    end;
+    Inc(i);
+    if i > L then Break;
+
+    // 索引 %0:d
+    if (Ord(sFormat[i]) in [Ord('0')..Ord('9')]) and (i < L) and
+       (sFormat[i+1] = ':') then begin
+      c := Ord(sFormat[i]) - 48;
+      Inc(i, 2);
+      if i > L then Break;
+    end;
+
+    if sFormat[i] = '%' then begin        // %%
+      Result := Result + '%';
+    end else
+    // 处理 %.2d %.2x %.2f 这类带精度格式
+    if (sFormat[i] = '.') and (i+2 <= L) and (c <= High(Args)) and
+       (Ord(sFormat[i+1]) in [Ord('0')..Ord('9')]) then
+    begin
+      prec := Ord(sFormat[i+1]) - 48;
+
+      // 整数/十六进制
+      if sFormat[i+2] in ['d','x','p'] then
+      begin
+        if Args[c].VType = vtInteger then begin
+          j := Args[c].VInteger;
+          if sFormat[i+2] = 'd' then
+            decim := IntToStr(j)
+          else
+            decim := IntToHex(j, prec);
+
+          for j := Length(decim)+1 to prec do
+            decim := '0' + decim;
+
+          Result := Result + decim;
+          Inc(c);
+          Inc(i, 2);
+        end;
+      end;
+
+      // 浮点数 %.2f
+      if sFormat[i+2] in ['f','g'] then
+      begin
+        if Args[c].VType = vtExtended then begin
+         // Str(Args[c].VExtended^:0:prec, decim);
+
+
+    // 核心：乘100取整，纯整数运算，不触发FPU格式化
+    IntVal :=round(Args[c].VExtended^ * 100);
+
+    // 拆分整数和小数
+    IntPart := IntVal div 100;
+    FracPart := Abs(IntVal mod 100);
+
+    // 拼接字符串
+    decim := IntToStr(IntPart) + '.';
+    if FracPart < 10 then decim := decim + '0'; // 补0
+    decim := decim + IntToStr(FracPart);
+
+  
+
+          Result := Result + decim;
+          Inc(c);
+          Inc(i, 2);
+        end;
+      end;
+    end else
+    // 普通无精度格式 %s %d %f %g
+    if c <= High(Args) then begin
+      with Args[c] do
+      case sFormat[i] of
+        's': case VType of
+          vtString:     Result := Result + string(VString^);
+          vtAnsiString: Result := Result + string(VAnsiString);
+          vtPChar:      Result := Result + VPChar;
+          vtChar:       Result := Result + VChar;
+          vtPWideChar:  Result := Result + VPWideChar;
+          vtWideChar:   Result := Result + VWideChar;
+{$ifdef UNICODE}
+          vtUnicodeString: Result := Result + string(VUnicodeString);
+{$endif}
+        end;
+
+        'g','f','n','m':
+
+
+         case VType of
+          vtExtended: begin
+            Str(VExtended^, decim);
+            Result := Result + decim;
+          end;
+          vtCurrency: begin
+            Str(VCurrency^, decim);
+            Result := Result + decim;
+          end;
+        end;
+
+        'd': if VType = vtInteger then
+               Result := Result + IntToStr(VInteger)
+             else if VType = vtInt64 then
+               Result := Result + IntToStr(VInt64^);
+
+        'x','p': if VType in [vtInteger, vtPointer] then
+                   Result := Result + IntToHex(VInteger, 8);
+      end;
+      Inc(c);
+    end;
+    Inc(i);
+  end;
+end;
+
+
+{
+
 function  Format(const sFormat: string; const Args: array of const): string;
 // supported: %% %s %d %x %.prec? %index:?
 var i, j, c, L: integer;
@@ -594,7 +733,7 @@ begin
       result := result+'%' else   // Format('%.3d',[4]) = '004':
     if (sFormat[i]='.') and (i+2<=L) and (c<=high(Args)) and
        (ord(sFormat[i+1]) in [ord('1')..ord('9')]) and
-       (ord(sFormat[i+2]) in [ord('d'),ord('x'),ord('p')]) and
+       (ord(sFormat[i+2]) in [ord('d'),ord('f'),ord('x'),ord('p')]) and
        (Args[c].VType=vtInteger) then begin
       j := Args[c].VInteger;
       if sFormat[i+2]='d' then
@@ -616,11 +755,11 @@ begin
         vtChar:      result := result+string(VChar);
         vtPWideChar: result := result+string(VPWideChar);
         vtWideChar:  result := result+string(VWideChar);
-{$ifdef UNICODE}
+{$ifdef UNICODE
         vtUnicodeString: result := result+string(VUnicodeString);
-{$endif}
+{$endif
       end;
-{      'g','f','n','m': case VType of
+      'g','f','n','m': case VType of
       vtExtended: begin
          str(VExtended^,decim);
          result := result+decim;
@@ -629,7 +768,7 @@ begin
          str(VCurrency^,decim);
          result := result+decim;
        end;
-       end;  // add 3kb to the .exe -> use str() and %s parameter }
+       end;  // add 3kb to the .exe -> use str() and %s parameter
       'd': if VType=vtInteger then
              result := result+IntToStr(VInteger) else
            if VType=vtInt64 then
@@ -642,6 +781,8 @@ begin
     Inc(i);
   end;
 end;
+}
+
 
 function  IntToStr(Value: integer): string;
 {$if Defined(UNICODE) or Defined(FPC)}

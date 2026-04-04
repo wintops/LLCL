@@ -83,11 +83,18 @@ unit Graphics;
 interface
 
 uses
-  LLCLOSInt, Windows,
-  Classes;
+  LLCLOSInt, Windows,   Classes;
 
 type
   TColor = -$7FFFFFFF-1..$7FFFFFFF;
+
+
+
+TPenStyle = (psSolid, psDash, psDot, psDashDot, psDashDotDot, psinsideFrame, psPattern,psClear);
+TPenStyleSet = set of TPenStyle;
+TPenMode = (pmBlack, pmWhite, pmNop, pmNot, pmCopy, pmNotCopy,pmMergePenNot, pmMaskPenNot, pmMergeNotPen, pmMaskNotPen, pmMerge,pmNotMerge, pmMask, pmNotMask, pmXor, pmNotXor);
+
+
 
   TFontStyle = (fsBold, fsItalic, fsUnderline, fsStrikeOut);
   TFontStyles = set of TFontStyle;
@@ -123,50 +130,82 @@ type
     property  Color: integer read fColor write SetColor;
   end;
 
-  TPen = object(TStaticHandle)
+
+  TPen = class(TPersistent)
   private
-    fWidth: integer;
+  fColor: integer;
+  fHandle: THandle;
+  fWidth: integer;
     procedure SetWidth(const Value: integer);
+     procedure SetColor(const Value: integer);
+      procedure Select(Canvas: HDC);
   public
-    procedure Select(Canvas: HDC);
+    Style:TPenStyle;
+    Mode:TPenMode;
+
     property  Width: integer read fWidth write SetWidth;
+      property  Color: integer read fColor write SetColor;
   end;
 
   TBrushStyle = (bsSolid, bsClear, bsHorizontal, bsVertical, bsFDiagonal,
     bsBDiagonal, bsCross, bsDiagCross);
 
-  TBrush = object(TStaticHandle)
+  TBrush = class(TPersistent)
   private
+  fHandle: THandle;
+  fColor: integer;
     fStyle: TBrushStyle;
     procedure SetStyle(const Value: TBrushStyle);
+     procedure SetColor(const Value: integer);
     function  GetHandle(): THandle;
+     procedure SetHandle(Value:THandle);
+     procedure Select(Canvas: HDC);
   public
     property  Style: TBrushStyle read fStyle write SetStyle;
-    property  Handle: THandle read GetHandle;
+    property  Handle: THandle read GetHandle write SetHandle;
+      property  Color: integer read fColor write SetColor;
   end;
 
-  TCanvas = class
+
+  TBitmap=class;
+
+    TCanvas = class(TPersistent)
   private
     fFont: TFont;
-    fHandle: THandle;
+    FHandle: HDC;
     procedure SetFont(Value: TFont);
     function  GetFont(): TFont;
+     procedure SetHandle(Value: HDC);
+
   protected
     procedure PrepareText;
   public
     Pen: TPen;
     Brush: TBrush;
+
+    constructor Create;
     destructor  Destroy; override;
+
+    procedure BeginPath;
+    procedure EndPath;
+    procedure Stroke;
+    procedure BeginUpdate;
+    procedure EndUpdate;
+    procedure Clear;
     procedure FillRect(const R: TRect);
     procedure MoveTo(x,y: integer);
     procedure LineTo(x,y: integer);
-    procedure Rectangle(x1,y1,x2,y2: integer);
+    procedure Rectangle(x1,y1,x2,y2: integer);overload;
+    procedure Rectangle(const R: TRect); overload;
     procedure FrameRect(const Rect: TRect; cl1,cl2: integer);
     procedure TextOut(x,y: integer; const s: string);
     procedure TextRect(const Rect: TRect; x,y: integer; const s:string);
     function  TextWidth(const s: string): integer;
     function  TextHeight(const s: string): integer;
-    property  Handle: THandle read fHandle write fHandle;
+
+    procedure  Draw(X, Y: Integer; Bitmap: TBitmap);
+
+    property Handle: HDC read FHandle write SetHandle;
     property  Font: TFont read GetFont write SetFont;
   end;
 
@@ -188,18 +227,23 @@ type
 
   TBitmap = class(TGraphicData)
   private
+   FCanvas:TCanvas;
+   BmpHandle:HBITMAP;
+    FOldBitmap :HBITMAP;
 {$IFDEF LLCL_OPT_IMGTRANSPARENT}
     TranspType: integer;
 {$ENDIF LLCL_OPT_IMGTRANSPARENT}
     function  GetEmpty(): boolean;
     procedure DrawRect(const R: TRect; Canvas: TCanvas; Stretch: boolean);
     procedure MoveToData(BufferBitmap: pointer; BufferSize: integer);
+     function GetCanvas: TCanvas;
 {$IFDEF LLCL_OPT_PNGSUPPORT}
     function  ConvertFromPNG(): boolean;
 {$ENDIF LLCL_OPT_PNGSUPPORT}
 {$IFDEF LLCL_OPT_IMGTRANSPARENT}
     procedure TranspPreProcess();
     function  TranspProcess(DestHDC: HDC; const R: TRect; Stretch: boolean): boolean;
+
 {$ENDIF LLCL_OPT_IMGTRANSPARENT}
   protected
 {$IFDEF LLCL_OPT_PNGSUPPORT}
@@ -207,10 +251,16 @@ type
 {$ENDIF LLCL_OPT_PNGSUPPORT}
     function  LoadFromMemory(BufferBitmap: pointer; BufferSize: integer): boolean;
   public
+     Handle:HBITMAP;
+     width:integer;
+     height:integer;
     procedure Assign(ABitmap: TBitmap);
     procedure LoadFromResourceName(Instance: THandle; const ResName: string);
     procedure LoadFromFile(const FileName: string);
+
+    procedure CreateCanvasHandle;
     property  Empty: boolean read GetEmpty;
+      property Canvas: TCanvas read GetCanvas;
   end;
 
   /// this TImage component only handle a bitmap
@@ -366,6 +416,16 @@ const
   TPNGSIGNATURE1    = $474E5089;  // #89'PNG' inversed
 {$ENDIF LLCL_OPT_PNGSUPPORT}
 
+
+
+function ColorToRGB(Color: TColor): Longint;
+begin
+  if Color < 0 then
+    Result := GetSysColor(Color and $000000FF) else
+    Result := Color;
+end;
+
+
 //------------------------------------------------------------------------------
 
 { TFont }
@@ -448,21 +508,33 @@ begin
   if fHandle=0 then begin // create object once
     if Width=0 then
       fWidth := 1;
-    fHandle := LLCL_CreatePen(PS_SOLID, Width, Color);
+    fHandle := LLCL_CreatePen(ord(Style), Width, Color);
   end;
   LLCL_SelectObject(Canvas, fHandle);
 end;
 
 procedure TPen.SetWidth(const Value: integer);
 begin
-  SetValue(fWidth, Value);
+ fWidth:=Value
+end;
+
+procedure TPen.SetColor(const Value: integer);
+begin
+ if(fHandle<>0) then   LLCL_DeleteObject(fHandle);
+     if Width=0 then
+      fWidth := 1;
+  fColor:=Value;
+  fHandle := LLCL_CreatePen(ord(Style), Width, fColor);
+
 end;
 
 { TBrush }
 
 procedure TBrush.SetStyle(const Value: TBrushStyle);
 begin // tricky conversion of Value into integer for shorter code
-  SetValue(PInteger(@fStyle)^, integer(Value));
+ // SetValue(PInteger(@fStyle)^, integer(Value));
+  fStyle:= Value;
+
 end;
 
 function TBrush.GetHandle(): THandle;
@@ -475,7 +547,65 @@ begin
   result := fHandle;
 end;
 
+
+procedure TBrush.SetHandle(Value:  THandle);
+//var   BrushData: TBrushData;
+begin
+ // BrushData := DefBrushData;
+ if fHandle<>0 then LLCL_DeleteObject(fHandle);
+  fHandle := Value;
+//  SetData(BrushData);
+end;
+
+procedure TBrush.SetColor(const Value: integer);
+begin
+ if(fHandle<>0) then   LLCL_DeleteObject(fHandle);
+
+  fColor:=Value;
+  fHandle := LLCL_CreateSolidBrush(fColor);
+end;
+
+
+procedure TBrush.Select(Canvas: HDC);
+begin
+
+  LLCL_SelectObject(Canvas, Handle);
+end;
+
 { TCanvas }
+
+constructor TCanvas.Create;
+
+ const
+   PenModes: array[TPenMode] of Word =
+    (R2_BLACK, R2_WHITE, R2_NOP, R2_NOT, R2_COPYPEN, R2_NOTCOPYPEN, R2_MERGEPENNOT,
+     R2_MASKPENNOT, R2_MERGENOTPEN, R2_MASKNOTPEN, R2_MERGEPEN, R2_NOTMERGEPEN,
+     R2_MASKPEN, R2_NOTMASKPEN, R2_XORPEN, R2_NOTXORPEN);
+begin
+  inherited Create;
+
+  Pen := TPen.Create;
+  pen.Color:=clBlack;
+  Pen.Style:=psSolid;
+  Pen.Mode:=pmCopy;
+  //Pen.Select(fHandle);
+
+
+
+ //Pen.Select(FHandle);
+  SetROP2(FHandle, PenModes[Pen.Mode]);
+
+
+  Brush := TBrush.Create;
+ // SelectObject(FHandle, Brush.Handle);
+  //if Brush.Style = bsSolid then
+  begin
+    SetBkColor(FHandle, ColorToRGB(Brush.Color));
+    SetBkMode(FHandle, OPAQUE);
+  end
+end;
+
+
 
 destructor TCanvas.Destroy;
 begin
@@ -483,6 +613,51 @@ begin
   LLCL_DeleteObject(Pen.fHandle);
   fFont.Free;
   inherited;
+end;
+
+procedure   TCanvas.BeginPath;
+begin
+end;
+procedure   TCanvas.EndPath;
+begin
+end;
+
+procedure   TCanvas.Stroke;
+begin
+end;
+procedure   TCanvas.BeginUpdate;
+begin
+
+
+
+end;
+procedure   TCanvas.EndUpdate;
+begin
+end;
+
+procedure   TCanvas.Clear;
+begin
+end;
+
+
+procedure TCanvas.SetHandle(Value: HDC);
+begin
+  if FHandle <> Value then
+  begin
+    if FHandle <> 0 then
+    begin
+     // DeselectHandles;
+      //FPenPos := GetPenPos;
+      FHandle := 0;
+     // Exclude(State, csHandleValid);
+    end;
+    if Value <> 0 then
+    begin
+     // Include(State, csHandleValid);
+      FHandle := Value;
+    //  SetPenPos(FPenPos);
+    end;
+  end;
 end;
 
 function TCanvas.GetFont(): TFont;
@@ -494,7 +669,7 @@ end;
 
 procedure TCanvas.SetFont(Value: TFont);
 begin
-  Font.Assign(Value);
+  fFont.Assign(Value);
 end;
 
 procedure TCanvas.FillRect(const R: TRect);
@@ -502,10 +677,28 @@ begin
   LLCL_FillRect(fHandle, R, Brush.Handle);
 end;
 
+
+procedure TCanvas.Rectangle(const R: TRect);
+begin
+  Pen.Select(fHandle);
+  Brush.Select(fHandle);
+
+    LLCL_FillRect(fHandle, R,  Brush.Handle);
+
+ // PatBlt(fHandle,r.left, r.top, r.right-r.left, r.bottom-r.Top, WHITENESS);
+ // LLCL_Rectangle(fHandle, r.left, r.top, r.right, r.bottom);
+
+ 
+
+end;
+
+
 procedure TCanvas.Rectangle(x1,y1,x2,y2: integer);
 begin
   Pen.Select(fHandle);
+  Brush.Select(fHandle);
   LLCL_Rectangle(fHandle, x1, y1, x2, y2);
+
 end;
 
 procedure TCanvas.FrameRect(const Rect: TRect; cl1,cl2: integer);
@@ -567,6 +760,29 @@ begin
   result := Size.cY;
 end;
 
+procedure TCanvas.Draw(X, Y: Integer; Bitmap: TBitmap);
+begin
+  if (Bitmap <> nil) then //and not Bitmap.Empty then
+  begin
+    //Changing;
+   // RequiredState([csHandleValid]);
+   // SetBkColor(FHandle, ColorToRGB(FBrush.Color));
+  //  SetTextColor(FHandle, ColorToRGB(FFont.Color));
+  //  Graphic.DrawRect( Rect(X, Y, X + Graphic.Width, Y + Graphic.Height),Self,False);
+
+    BitBlt(
+    Handle,
+   X, Y,
+    Bitmap.Width,
+    Bitmap.Height,
+    Bitmap.Canvas.Handle,
+    0, 0,
+    SRCCOPY
+  );
+   // Changed;
+  end;
+end;
+
 { TGraphicData }
 
 destructor TGraphicData.Destroy;
@@ -615,25 +831,25 @@ begin
 end;
 
 procedure TBitmap.DrawRect(const R: TRect; Canvas: TCanvas; Stretch: boolean);
-var Width, Height, YCoord: integer;
+var Width_, Height_, YCoord: integer;
 begin
   if Assigned(fData) and (fSize>=(TBMP_HEADERSIZE + SizeOf(TBitmapFileHeader))) then
   with PBMP(fData)^ do
   if (string(ClassName)=TBITMAPNAME) and (FileHeader.bfType=TBITMAPIDENT) then
     begin
       YCoord := 0;
-      Width := R.Right - R.Left;
-      Height := R.Bottom - R.Top;
+      Width_ := R.Right - R.Left;
+      Height_ := R.Bottom - R.Top;
       if Stretch then
         LLCL_SetStretchBltMode(Canvas.Handle, HALFTONE)
       else
         begin
-          if InfoHeader.bmiHeader.biWidth<Width then
-            Width := InfoHeader.bmiHeader.biWidth;
-          if InfoHeader.bmiHeader.biHeight<Height then
-            Height := InfoHeader.bmiHeader.biHeight
+          if InfoHeader.bmiHeader.biWidth<Width_ then
+            Width_ := InfoHeader.bmiHeader.biWidth;
+          if InfoHeader.bmiHeader.biHeight<Height_ then
+            Height_ := InfoHeader.bmiHeader.biHeight
           else
-            YCoord := InfoHeader.bmiHeader.biHeight - Height;
+            YCoord := InfoHeader.bmiHeader.biHeight - Height_;
         end;
       {$IFDEF LLCL_OPT_IMGTRANSPARENT}
       if InfoHeader.bmiHeader.biBitCount=32 then
@@ -653,8 +869,8 @@ begin
           Canvas.Handle,  // handle of device context
           R.Left,         // x-coordinate of upper-left corner of dest. rectangle
           R.Top,          // y-coordinate of upper-left corner of dest. rectangle
-          Width,          // dest. rectangle width
-          Height,         // dest. rectangle height
+          Width_,          // dest. rectangle width
+          Height_,         // dest. rectangle height
           0,      // x-coordinate of lower-left corner of source rect.
           YCoord, // y-coordinate of lower-left corner of source rect.
           InfoHeader.bmiHeader.biWidth,  // source rectangle width
@@ -672,8 +888,8 @@ begin
           Canvas.Handle,  // handle of device context
           R.Left,         // x-coordinate of upper-left corner of dest. rectangle
           R.Top,          // y-coordinate of upper-left corner of dest. rectangle
-          Width,          // image width
-          Height,         // image height
+          Width_,          // image width
+          Height_,         // image height
           0,      // x-coordinate of lower-left corner of source rect.
           YCoord, // y-coordinate of lower-left corner of source rect.
           0,      // first scan line in array
@@ -892,6 +1108,65 @@ begin
   if not IsOK then
     raise EClassesError.Create(LLLC_STR_GRAP_BITMAPFILEERR);
 end;
+
+
+function TBitmap.GetCanvas: TCanvas;
+begin
+  if FCanvas = nil then
+  begin
+    //HandleNeeded;
+    if FCanvas = nil then    // possible recursion
+    begin
+      FCanvas := TCanvas.Create;
+     // FCanvas.OnChange := Changed;
+     // FCanvas.OnChanging := Changing;
+    end;
+  end;
+  Result := FCanvas;
+end;
+
+
+procedure TBitmap.CreateCanvasHandle;
+var
+
+ 
+  ScreenDC: HDC;
+begin
+  // 1. 释放旧 DC
+  if Handle <> 0 then
+  begin
+    SelectObject(Handle, FOldBitmap); // ? 必须恢复旧位图
+    DeleteObject(bmphandle);
+    DeleteDC(Handle);
+    Handle := 0;
+    Canvas.Handle := 0;
+  end;
+
+  ScreenDC := GetDC(0);
+
+  // 2. 创建内存 DC
+  Handle := CreateCompatibleDC(ScreenDC);
+
+  // 3. 创建位图
+  BmpHandle := CreateCompatibleBitmap(ScreenDC, Self.Width, Self.Height);
+
+  // 4. 选入位图 + 保存旧位图（?? 这是你缺失的最重要一行）
+ FOldBitmap:= SelectObject(Handle, BmpHandle);
+
+
+
+  // 6. 绑定到 Canvas
+  Canvas.Handle := Handle;
+
+
+
+
+  // 7. 释放屏幕DC
+  ReleaseDC(0, ScreenDC);
+
+
+end;
+
 
 { TPicture }
 

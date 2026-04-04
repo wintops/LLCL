@@ -1758,6 +1758,9 @@ begin
                 hSaveObj := LLCL_SelectObject(Handle, hMemBMP);
               end;
 {$endif}
+
+        //LLCL_FillRect(Handle, ClientRect(){PSForm.rcPaint}, GetStockObject(BLACK_BRUSH){Brush.Handle});  // (See WM_ERASEBKGND)
+
             LLCL_FillRect(Handle, PSForm.rcPaint, Brush.Handle);  // (See WM_ERASEBKGND)
           end
         else
@@ -1772,12 +1775,13 @@ begin
             if fDoubleBuffered then
               begin
                 LLCL_BitBlt(hSaveHDC, PSForm.rcPaint.Left, PSForm.rcPaint.Top, PSForm.rcPaint.Right - PSForm.rcPaint.Left, PSForm.rcPaint.Bottom - PSForm.rcPaint.Top, Handle, PSForm.rcPaint.Left, PSForm.rcPaint.Top, SRCCOPY);
+              //  LLCL_BitBlt(hSaveHDC, PSForm.rcPaint.Left, PSForm.rcPaint.Top, PSForm.rcPaint.Right - PSForm.rcPaint.Left, PSForm.rcPaint.Bottom - PSForm.rcPaint.Top, Handle, PSForm.rcPaint.Left, PSForm.rcPaint.Top, SRCCOPY);
                 LLCL_SelectObject(Handle, hSaveObj);
                 LLCL_DeleteObject(hMemBMP);
                 LLCL_DeleteDC(Handle);
               end;
 {$endif}
-            LLCL_EndPaint(self.fHandle, PSForm);
+            LLCL_EndPaint(Handle, PSForm);
             // (No inherited)
             exit;
           end
@@ -1804,7 +1808,10 @@ var CtlOrParent: TWinControl;
 begin
   // Modified for some TWinControls
   if ATType=ATTCustomForm then
+  begin
+
     Msg.Result := 1                   // (Done inside WM_PAINT)
+  end  
   else
     if (ATType=ATTGroupBox) or ((ATType=ATTComboBox) and (TComboBox(self).Style=csSimple)) then
       begin
