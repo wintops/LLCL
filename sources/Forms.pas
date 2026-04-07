@@ -713,12 +713,14 @@ var TmpMsg: TWMMove;
 var aRect: TRect;
 begin
   // Modify stored positions (client positions received)
+
   Move(Msg, TmpMsg, SizeOf(TmpMsg));
   if LLCL_GetWindowRect(Handle, aRect) then
     begin
       TmpMsg.XPos := aRect.Left;
       TmpMsg.YPos := aRect.Top;
     end;
+
   inherited WMMove(TmpMsg);
 end;
 

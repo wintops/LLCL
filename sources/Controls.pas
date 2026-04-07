@@ -123,6 +123,7 @@ type
   TKeyPressEvent = procedure (Sender: TObject; var Key: Char) of object;
   TKeyEvent = procedure (Sender: TObject; var Key: Word; Shift: TShiftState) of object;
   TMouseEvent = procedure (Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: integer) of object;
+   TMouseMoveEvent = procedure(Sender: TObject; Shift: TShiftState;  X, Y: Integer) of object;
 
 {$IFNDEF FPC}             // TCreateParams is declared in LCLType for FPC/Lazarus
   TCreateParams = record
@@ -282,6 +283,7 @@ type
     EOnKeyUp: TKeyEvent;
     EOnMouseDown: TMouseEvent;
     EOnMouseUp: TMouseEvent;
+    EOnMouseMove: TMouseMoveEvent;
     EOnDblClick: TNotifyEvent;
     procedure SetEnabled(Value: boolean);
     function  GetCCount(): integer;
@@ -384,6 +386,7 @@ type
     property  OnKeyUp: TKeyEvent read EOnKeyUp write EOnKeyUp;
     property  OnMouseDown: TMouseEvent read EOnMouseDown write EOnMouseDown;
     property  OnMouseUp: TMouseEvent read EOnMouseUp write EOnMouseUp;
+    property  OnMouseMove: TMouseMoveEvent read EOnMouseMove write EOnMouseMove;
     property  OnDblClick: TNotifyEvent read EOnDblClick write EOnDblClick;
   end;
 
@@ -831,11 +834,11 @@ begin
 end;
 
 procedure TWinControl.ReadProperty(const PropName: string; Reader: TReader);
-const Properties: array[0..9] of PChar = (
+const Properties: array[0..10] of PChar = (
     'Text',
     'TabOrder', 'TabStop', 'Enabled',
     'OnKeyPress', 'OnKeyDown', 'OnKeyUp',
-    'OnMouseDown', 'OnMouseUp', 'OnDblClick'
+    'OnMouseDown', 'OnMouseUp', 'OnMouseMove', 'OnDblClick'
     );
 begin
   case StringIndex(PropName, Properties) of
@@ -848,7 +851,8 @@ begin
     6 : TMethod(EOnKeyUp)     := FindMethod(Reader);
     7 : TMethod(EOnMouseDown) := FindMethod(Reader);
     8 : TMethod(EOnMouseUp)   := FindMethod(Reader);
-    9 : TMethod(EOnDblClick)  := FindMethod(Reader);
+    9 : TMethod(EOnMouseMove) := FindMethod(Reader);
+   10 : TMethod(EOnDblClick)  := FindMethod(Reader);
     else inherited;
   end;
 end;
@@ -1905,11 +1909,13 @@ begin
   inherited;
   // Currently unused for other controls, because
   //   only the client area is concerned
+
   if ATType=ATTCustomForm then
     begin
       fLeft := Msg.XPos;
       fTop  := Msg.YPos;
     end;
+ 
 end;
 
 procedure TWinControl.WMNCHitTest(var Msg: TWMNCHitTest);
@@ -1924,6 +1930,8 @@ procedure TWinControl.WMMouseMove(var Msg: TWMMouseMove);
 begin
   if ATType<>ATTGroupBox then // Because of WM_NCHitTest message modification
     inherited;
+  if Assigned(EOnMouseMove) then
+    EOnMouseMove(self, TShiftState(LLCLS_KeysToShiftState(Msg.Keys)), Msg.XPos, Msg.YPos);     
 end;
 
 procedure TWinControl.WMHScroll(var Msg: TWMHScroll);
