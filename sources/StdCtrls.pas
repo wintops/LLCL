@@ -559,6 +559,7 @@ begin
       SelectAll();
       result := tkSkip;
     end;
+
 end;
 
 procedure TEdit.WMSetFocus(var Msg: TWMSetFocus);

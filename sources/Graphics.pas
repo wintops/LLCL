@@ -136,15 +136,20 @@ TPenMode = (pmBlack, pmWhite, pmNop, pmNot, pmCopy, pmNotCopy,pmMergePenNot, pmM
   fColor: integer;
   fHandle: THandle;
   fWidth: integer;
+  fStyle:TPenStyle;
     procedure SetWidth(const Value: integer);
      procedure SetColor(const Value: integer);
-      procedure Select(Canvas: HDC);
-  public
-    Style:TPenStyle;
-    Mode:TPenMode;
+         procedure SetStyle(const Value: TPenStyle);
 
+  public
+     Mode:TPenMode;
+    constructor Create;
+    destructor Destroy; override;
+
+    procedure Select(Canvas: HDC);
     property  Width: integer read fWidth write SetWidth;
       property  Color: integer read fColor write SetColor;
+            property    Style:TPenStyle read fStyle write SetStyle;
   end;
 
   TBrushStyle = (bsSolid, bsClear, bsHorizontal, bsVertical, bsFDiagonal,
@@ -164,6 +169,7 @@ TPenMode = (pmBlack, pmWhite, pmNop, pmNot, pmCopy, pmNotCopy,pmMergePenNot, pmM
     property  Style: TBrushStyle read fStyle write SetStyle;
     property  Handle: THandle read GetHandle write SetHandle;
       property  Color: integer read fColor write SetColor;
+
   end;
 
 
@@ -503,29 +509,66 @@ end;
 
 { TPen }
 
+constructor TPen.Create;
+begin
+  inherited;
+  fColor := clBlack;
+  fWidth := 1;
+  fStyle := psSolid;  // 初始实线
+  fHandle := 0;
+end;
+
+destructor TPen.Destroy;
+begin
+  if fHandle <> 0 then
+    LLCL_DeleteObject(fHandle);
+  inherited;
+end;
+
 procedure TPen.Select(Canvas: HDC);
 begin
-  if fHandle=0 then begin // create object once
-    if Width=0 then
+  if fHandle = 0 then  // 第一次使用才创建
+  begin
+    if fWidth = 0 then
       fWidth := 1;
-    fHandle := LLCL_CreatePen(ord(Style), Width, Color);
+    fHandle := LLCL_CreatePen(ord(fStyle), fWidth, fColor);
   end;
   LLCL_SelectObject(Canvas, fHandle);
 end;
 
 procedure TPen.SetWidth(const Value: integer);
 begin
- fWidth:=Value
+  if fWidth = Value then Exit; // 相同不处理
+  if fHandle <> 0 then
+  begin
+    LLCL_DeleteObject(fHandle);
+    fHandle := 0; // 必须置空，下次Select重建
+  end;
+  fWidth := Value;
 end;
 
 procedure TPen.SetColor(const Value: integer);
 begin
- if(fHandle<>0) then   LLCL_DeleteObject(fHandle);
-     if Width=0 then
-      fWidth := 1;
-  fColor:=Value;
-  fHandle := LLCL_CreatePen(ord(Style), Width, fColor);
+  if fColor = Value then Exit; // 相同不处理
+  if fHandle <> 0 then
+  begin
+    LLCL_DeleteObject(fHandle);
+    fHandle := 0; // 必须置空
+  end;
+  fColor := Value;
+end;
 
+procedure TPen.SetStyle(const Value: TPenStyle);
+begin
+  if fStyle = Value then Exit;
+
+  if fHandle <> 0 then
+  begin
+    LLCL_DeleteObject(fHandle);
+    fHandle := 0; // 标记需要重建
+  end;
+
+  fStyle := Value;
 end;
 
 { TBrush }
@@ -592,13 +635,13 @@ begin
 
 
 
- //Pen.Select(FHandle);
+ Pen.Select(FHandle);
   SetROP2(FHandle, PenModes[Pen.Mode]);
 
 
   Brush := TBrush.Create;
- // SelectObject(FHandle, Brush.Handle);
-  //if Brush.Style = bsSolid then
+  SelectObject(FHandle, Brush.Handle);
+  if Brush.Style = bsSolid then
   begin
     SetBkColor(FHandle, ColorToRGB(Brush.Color));
     SetBkMode(FHandle, OPAQUE);

@@ -1510,6 +1510,7 @@ begin
   if fHandle=0 then exit;   // (later when created at runtime)
   if ATType<>ATTCustomForm then     // Done inside Forms for them
     LLCL_MoveWindow(fHandle, ALeft, ATop, AWidth, AHeight, true);
+  // LLCL_SetWindowPos(fHandle,0, ALeft, ATop, AWidth, AHeight,4);
 end;
 
 procedure TWinControl.BringToFront;
@@ -1634,6 +1635,7 @@ begin
       // Enter for some specific controls (no enter=default)
       if (Msg.CharCode=VK_RETURN) and (KeyProcess=tkNoEnterDef) then
         begin
+    
           ClickCall(false, false);
           if fKeyboardMsg<>1 then
             inherited;
@@ -1644,11 +1646,15 @@ begin
         // Form key processing (parent form already searched before)
         // (Not standard: Enter(default), Escape (cancel)
         //   are processed after WM_KEYUP in LCL)
+        begin
+        Msg.Result := 0;  exit;
+        
         if (ParentForm<>nil) and (ParentForm<>self) then
           if not ParentForm.DefCanButton(Msg.CharCode) then
             if not ((Msg.CharCode=VK_RETURN) and (KeyProcess=tkSkipNonEnterDef)) then
               if fKeyboardMsg<>1 then
                 inherited;
+        end        
       else
         begin
           // UI indicators...
@@ -1670,6 +1676,7 @@ end;
 
 procedure TWinControl.WMKeyDown(var Msg: TWMKeyDown);
 begin
+//outputdebugstring(pchar(inttostr(Msg.CharCode)));
   // Arrow keys - before (no WMChar message for them)
   if (Msg.CharCode in [VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN])
     and (not fArrowKeysInternal) then // for controls not processing arrow keys internally
@@ -1690,6 +1697,7 @@ begin
     VK_RIGHT, VK_DOWN:      // Next control
       NewFormFocus(tftNext);
     end;
+ Msg.Result := 0;  
 end;
 
 procedure TWinControl.WMKeyUp(var Msg: TWMKeyUp);

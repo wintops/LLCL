@@ -135,16 +135,14 @@ uses
 {$IFDEF FPC}
   {$I LLCLFPCInc.inc}   // (for LLCL_MISSING_WINDOWS_DEC, LLCL_EXTWIN_WIDESTRUCT, LLCL_FPC_UTF8RTL, LLCL_FPC_CPSTRING, LLCL_FPC_ANSI_LLCL, LLCL_FPC_ANSISYS or LLCL_FPC_UNISYS)
 {$ELSE FPC}
-
-    type UnicodeChar = WideChar;
-    type PUnicodeChar = PWideChar;
   {$if not Declared(CompilerVersion)}
     const CompilerVersion = 1;  // Before Delphi 6
   {$ifend}
   {$if CompilerVersion<20}      // Before Delphi 2009
     type NativeInt = Integer;
     type unicodestring = widestring;
-
+    type UnicodeChar = WideChar;
+    type PUnicodeChar = PWideChar;
   {$ifend}
   {$if CompilerVersion<21}      // Before Delphi 2010
     type NativeUInt = Cardinal;
@@ -482,10 +480,6 @@ const
   CVERSION          = 'version.dll';
   CADVAPI32         = 'advapi32.dll';
 
- // function  log(lpszDst: LPCSTR): integer; stdcall; external CUSER32 name 'log';
-
-// function Copy(S: string; Index: Integer; Count: Integer): string;
-
 function  GetVersionExW(var lpVersionInformation: TOSVersionInfoW): BOOL; stdcall; external CKERNEL32 name 'GetVersionExW';
 function  GetModuleHandleW(lpModuleName: LPCWSTR): HMODULE; stdcall; external CKERNEL32 name 'GetModuleHandleW';
 function  GetModuleFileNameW(hModule: HINST; lpFilename: LPCWSTR; nSize: DWORD): DWORD; stdcall; external CKERNEL32 name 'GetModuleFileNameW';
@@ -765,7 +759,7 @@ function  RegCloseKey(hKey: HKEY): longint; stdcall; external ADVAPI32 name 'Reg
 
 // API Functions mapping
 
-function  LLCL_GetModuleHandle(lpModuleName: string): HMODULE;
+function  LLCL_GetModuleHandle(lpModuleName: PChar): HMODULE;
 function  LLCL_RegisterClass(const lpWndClass: TWndClass): ATOM;
 function  LLCL_UnregisterClass(lpClassName: PChar; hInstance: HINST): BOOL;
 function  LLCL_CreateWindowEx(dwExStyle: DWORD; lpClassName: PChar;
@@ -1190,7 +1184,6 @@ var
 
 implementation
 
-
 {$IFDEF FPC}
   {$PUSH} {$HINTS OFF}
 {$ENDIF}
@@ -1209,15 +1202,10 @@ function  LLCLS_FFNF_AA(lpFileName: PChar; hFindFile: HANDLE; var lpFindFileData
 function  LLCLS_FFNF_WW(lpFileName: PUnicodeChar; hFindFile: HANDLE; var lpFindFileData: TWin32FindDataW; var OutFileName: unicodestring; var ResFunc: HANDLE; var LastOSError: DWORD): boolean; forward;
 {$ENDIF}
 
-function  StrToTextDispA(const S: string): ansistring; forward;overload;
-function  StrToTextDispA(const S: pwidechar;len:integer): ansistring; forward;overload;
+function  StrToTextDispA(const S: string): ansistring; forward;
 function  StrToTextDispW(const S: string): unicodestring; forward;
-function  StrFromTextDispA(const S: ansistring): string; forward;overload;
- function StrFromTextDispA(const S: pansichar;len:integer): string;forward;overload;
-
-function  StrFromTextDispW(const S: unicodestring): string; forward; overload;
-function StrFromTextDispW(const S: pwidechar;l:integer): string;forward; overload;
-
+function  StrFromTextDispA(const S: ansistring): string; forward;
+function  StrFromTextDispW(const S: unicodestring): string; forward;
 function  PointerToNativeUInt(p: Pointer): NativeUInt; forward;
 procedure StrLCopyA(var Dest: array of AnsiChar; const Source: ansistring; MaxLen: cardinal); forward;
 procedure StrLCopyW(var Dest: array of WideChar; const Source: unicodestring; MaxLen: cardinal); forward;
@@ -1242,7 +1230,7 @@ var PAddrAlphaBlend: function(hdcDest: HDC; nXOriginDest, nYOriginDest, nWidthDe
 
 //------------------------------------------------------------------------------
 
-function LLCL_GetModuleHandle(lpModuleName: string): HMODULE;
+function LLCL_GetModuleHandle(lpModuleName: PChar): HMODULE;
 {$IFDEF LLCL_UNICODE_API_W}
 var wStr: unicodestring;
 {$ENDIF}
@@ -1262,7 +1250,6 @@ begin
     result := 0;
 {$ELSE}
     begin
-
       aStr := StrToTextDispA(lpModuleName);
       result := GetModuleHandleA(@aStr[1]);
     end;
@@ -1283,11 +1270,8 @@ begin
   if UnicodeEnabledOS then
     begin
       Move(lpWndClass, lpWndClassW, SizeOf(lpWndClassW));   // All versions have same size
-      //wStr := StrToTextDispW(lpWndClass.lpszClassName);
-      //lpWndClassW.lpszClassName := @wStr[1];
-
-      lpWndClassW.lpszClassName := lpWndClass.lpszClassName;
-      // MessageBoxW(0, pchar(wStr ), 'Debug', MB_OK);
+      wStr := StrToTextDispW(lpWndClass.lpszClassName);
+      lpWndClassW.lpszClassName := @wStr[1];
       result := RegisterClassW(lpWndClassW);
     end
   else
@@ -1345,8 +1329,7 @@ begin
     begin
       wClassName := StrToTextDispW(lpClassName);
       wWindowName := StrToTextDispW(lpWindowName);
-     //  MessageBoxW(0, lpWindowName, 'Debug', MB_OK);
-      result := CreateWindowExW(dwExStyle, lpClassName, lpWindowName,
+      result := CreateWindowExW(dwExStyle, @wClassName[1], @wWindowName[1],
         dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
     end
   else
@@ -1355,7 +1338,7 @@ begin
     result := 0;
 {$ELSE}
     begin
-      aClassName :=StrToTextDispA(lpClassName);
+      aClassName := StrToTextDispA(lpClassName);
       aWindowName := StrToTextDispA(lpWindowName);
       result := CreateWindowExA(dwExStyle, @aClassName[1], @aWindowName[1],
         dwStyle, X, Y, nWidth, nHeight, hWndParent, hMenu, hInstance, lpParam);
@@ -1998,13 +1981,10 @@ begin
 {$IFDEF LLCL_UNICODE_API_W}
   if UnicodeEnabledOS then
     begin
-
-   // MessageBoxW(0, pchar(lpName ), 'Debug', MB_OK);
       if (PointerToNativeUInt(lpName) shr 16)<>0 then    // Highword(s) non null
         begin
-          //wName := StrToTextDispW(lpName);
-          lpwName :=lpName;// @wName[1];
- //             MessageBoxW(0, pchar(lpwName ), 'Debug', MB_OK);
+          wName := StrToTextDispW(lpName);
+          lpwName := @wName[1];
         end
       else
         lpwName := PUnicodeChar(lpName);
@@ -2023,14 +2003,10 @@ begin
     result := 0;
 {$ELSE}
     begin
-
-
       if (PointerToNativeUInt(lpName) shr 16)<>0 then    // Highword(s) non null
         begin
-        //  MessageBoxW(0, lpName, 'Debug', MB_OK);
           aName := StrToTextDispA(lpName);
           lpaName := @aName[1];
-        //  MessageBoxA(0, lpaName, 'Debug', MB_OK);
         end
       else
         lpaName := PAnsiChar(lpName);
@@ -3312,7 +3288,6 @@ var ICC: TInitCommonControlsEx;
 begin
   LLCL_InitCommonControls();
   result := false;
-
   {$IFDEF LLCL_OBJFPC_MODE}FARPROC(PAddrInitCommonControlsEx){$ELSE}@PAddrInitCommonControlsEx{$ENDIF}
     := LLCL_GetProcAddress(LLCL_GetModuleHandle(CCOMCTL32), 'InitCommonControlsEx');
   if Assigned(PAddrInitCommonControlsEx) then
@@ -3328,11 +3303,9 @@ function LLCLS_GetModuleFileName(hModule: HINST): string;
 var wBuffer: array[0..MAX_PATH+1] of WideChar;  // (Including terminating null character, plus one)
 {$ENDIF}
 {$IFNDEF LLCL_UNICODE_API_W_ONLY}
-var aBuffer: array[0..MAX_PATH+1] of AnsiChar;
+var aBuffer: array[0..MAX_PATH+1] of AnsiChar;  // (Including terminating null character, plus one)
 {$ENDIF}
 var icount: integer;
-  I: Integer;  // (Including terminating null character, plus one)
- s:ansistring;
 begin
   result := '';
 {$IFDEF LLCL_UNICODE_API_W}
@@ -3342,10 +3315,7 @@ begin
       if icount>0 then
         begin
           wBuffer[icount] := WideChar(0); // (may be absent)
-
-           //  writeln( wBuffer);
-          //result := utf8toansi(utf8encode(wBuffer));
-          result := StrFromTextDispW(wBuffer,icount);
+          result := StrFromTextDispW(wBuffer);
         end;
     end
   else
@@ -3355,23 +3325,10 @@ begin
 {$ELSE}
     begin
       icount := GetModuleFileNameA(hModule, @aBuffer, Length(aBuffer)-1);
-
-
       if icount>0 then
         begin
           aBuffer[icount] := AnsiChar(0); // (may be absent)
-          {
-          setlength(s,icount);
-          for I := 0 to icount do
-          begin
-              s[i+1]:=aBuffer[i];
-          end;
-
-          MessageBoxA(0, pansichar(s), 'Debug', MB_OK);
-          }
-          result := StrFromTextDispA(aBuffer,icount);
-
-
+          result := StrFromTextDispA(aBuffer);
         end;
     end;
 {$ENDIF}
@@ -4297,7 +4254,7 @@ begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   result := S;
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-  result := UTF8ToString(S);
+  result := UTF8Decode(S);
 {$ELSE}
   result := UTF8ToAnsi(S);
 {$ENDIF} {$ENDIF}
@@ -4308,10 +4265,10 @@ begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   result := S;      // UTF8 data are stored as string
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-  result :=s;// UTF8ToString(S);
+  result := UTF8Decode(S);
 {$ELSE}
   {$IFDEF FPC}
-  result := s;//UTF8ToAnsi(S);       // Specific Ansi only mode
+  result := UTF8ToAnsi(S);       // Specific Ansi only mode
   {$ELSE FPC}
   result := S;
   {$ENDIF FPC}
@@ -5174,25 +5131,12 @@ end;
 
 {$ENDIF FPC}
 
-
-function WideToAnsi(const w: WideString): AnsiString;
-var
-  len: Integer;
-begin
-  len := WideCharToMultiByte(CP_ACP, 0, PWideChar(w), Length(w), nil, 0, nil, nil);
-  SetLength(Result, len);
-  WideCharToMultiByte(CP_ACP, 0, PWideChar(w), Length(w), PAnsiChar(Result), len, nil, nil);
-end;
-
 //------------------------------------------------------------------------------
 
 //
 // String Conversion for Text Displaying (Ansi version)
 //
-function StrToTextDispA(const S: string): ansistring; overload;
-
-var
-i,len:integer;
+function StrToTextDispA(const S: string): ansistring;
 begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   {$IFDEF LLCL_FPC_CPSTRING}
@@ -5206,46 +5150,7 @@ begin
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
   result := ansistring(S);
 {$ELSE}
-//writeln(s);
-//writeln(UTF8Encode(s));
-
-   //result :=s;//UTF8ToAnsi(s);
-            len:=length(s);
-            setlength(result,len);
-
-          for I := 1 to len do
-          begin
-              result[i]:=ansichar(s[i]);
-
-          end;
-
-//writeln(UTF8ToAnsi(result));
-{$ENDIF} {$ENDIF}
-  if @result[1]=nil then
-    result := AnsiChar(#00);
-end;
-
-
-function StrToTextDispA(const S: pwidechar;len:integer): ansistring;overload;
-begin
-{$IFDEF LLCL_UNICODE_STR_UTF8}
-  {$IFDEF LLCL_FPC_CPSTRING}
   result := S;
-  if StringCodePage(result)<>CP_UTF8 then
-    SetCodePage(rawbytestring(result), CP_UTF8, false);
-  SetCodePage(rawbytestring(result), LLCL_GetACP(), true);
-  {$ELSE}
-  result := UTF8ToAnsi(S);
-  {$ENDIF}
-{$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-  result := ansistring(S);
-{$ELSE}
-//writeln(s);
-//writeln(UTF8Encode(s));
-
-   result :=UTF8ToAnsi(s);
-
-//writeln(UTF8ToAnsi(result));
 {$ENDIF} {$ENDIF}
   if @result[1]=nil then
     result := AnsiChar(#00);
@@ -5255,12 +5160,9 @@ end;
 // String Conversion for Text Displaying (Unicode wide version)
 //
 function StrToTextDispW(const S: string): unicodestring;
-
 {$IFDEF LLCL_UNICODE_STR_UTF8}{$IFDEF LLCL_FPC_CPSTRING}
 var STemp: string;
 {$ENDIF}{$ENDIF}
-var
-i,l:integer;
 begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   {$IFDEF LLCL_FPC_CPSTRING}
@@ -5276,16 +5178,7 @@ begin
   result := UTF8Decode(S);
   {$ENDIF}
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-//result := S;
-          l:=length(s);
-         setlength(result,l);
-
-          for I := 1 to l do
-          begin
-              result[i]:=char(s[i]);
-
-          end;
-
+  result := S;
 {$ELSE}
   result := unicodestring(S);
 {$ENDIF} {$ENDIF}
@@ -5295,16 +5188,8 @@ end;
 
 //
 // String Conversion from Text Display (Ansi version)
-
-
-
 //
-
-
- function StrFromTextDispA(const S: pansichar;len:integer): string; overload;
-
-var
-i,l:integer;
+function StrFromTextDispA(const S: ansistring): string;
 begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   {$IFDEF LLCL_FPC_CPSTRING}
@@ -5318,63 +5203,14 @@ begin
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
   result := unicodestring(S);
 {$ELSE}
- // result := S;
-
-         setlength(result,len);
-
-          for I := 1 to len do
-          begin
-              result[i]:=char(s[i]);
-
-          end;
-          //result[l]:=#0;
-
-
-{$ENDIF} {$ENDIF}
-end;
-
-
-
-
-function StrFromTextDispA(const S: ansistring): string; overload;
-
-var
-i,l:integer;
-begin
-{$IFDEF LLCL_UNICODE_STR_UTF8}
-  {$IFDEF LLCL_FPC_CPSTRING}
   result := S;
-  SetCodePage(rawbytestring(result), LLCL_GetACP(), false);
-  SetCodePage(rawbytestring(result), CP_UTF8, true);
-  SetCodePage(rawbytestring(result), StringCodePage(' '), false);
-  {$ELSE}
-  result := AnsiToUTF8(S);
-  {$ENDIF}
-{$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-  result := unicodestring(S);
-{$ELSE}
- // result := S;
-
-    // MessageBoxA(0, pansichar(s), 'Debug', MB_OK);
-         l:=length(s);
-         setlength(result,l);
-
-          for I := 1 to l do
-          begin
-              result[i]:=char(s[i]);
-
-          end;
-          //result[l]:=#0;
-
-            //  MessageBoxW(0, pchar(result), 'Debug', MB_OK);
 {$ENDIF} {$ENDIF}
 end;
 
 //
 // String Conversion from Text Display (Unicode wide version)
 //
-function StrFromTextDispW(const S: unicodestring): string;overload;
-
+function StrFromTextDispW(const S: unicodestring): string;
 begin
 {$IFDEF LLCL_UNICODE_STR_UTF8}
   {$IFDEF LLCL_FPC_CPSTRING}
@@ -5389,36 +5225,6 @@ begin
   {$ENDIF}
 {$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
   result := S;
-{$ELSE}
-  result := ansistring(S);
-{$ENDIF} {$ENDIF}
-end;
-
-
-function StrFromTextDispW(const S: pwidechar;l:integer): string; overload;
-var
-i:integer;
-begin
-{$IFDEF LLCL_UNICODE_STR_UTF8}
-  {$IFDEF LLCL_FPC_CPSTRING}
-  result := string(S);
-  if StringCodePage(result)<>CP_UTF8 then
-    begin
-      SetCodePage(rawbytestring(result), CP_UTF8, true);
-      SetCodePage(rawbytestring(result), StringCodePage(' '), false);
-    end;
-  {$ELSE}
-  result := UTF8Encode(S);
-  {$ENDIF}
-{$ELSE} {$IFDEF LLCL_UNICODE_STR_UTF16}
-
-         setlength(result,l);
-
-          for I := 1 to l do
-          begin
-              result[i]:=char(s[i]);
-
-          end;
 {$ELSE}
   result := ansistring(S);
 {$ENDIF} {$ENDIF}
@@ -5448,17 +5254,6 @@ begin
   Dest[iLen] := WideChar(0);
 end;
 
- {
-function Copy(S: string; Index: Integer; Count: Integer): string;
-var
-  I: Integer;
-begin
-setlength(result,count);
-for I := index to index+count-1 do
-  result[i-index+1]:=s[i];
-
-end;
-}
 //------------------------------------------------------------------------------
 
 {$IFDEF LLCL_FPC_UTF8RTL}     // (FPC only)

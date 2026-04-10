@@ -410,7 +410,7 @@ const Properties: array[0..12] of PChar = (
     'Width', 'Height'
   );
 begin
- OutputDebugString(pchar(PropName));
+ //OutputDebugString(pchar(PropName));
   case StringIndex(PropName, Properties) of
     0 : fClientWidth := Reader.IntegerProperty;     // Used internaly
     1 : fClientHeight := Reader.IntegerProperty;    //   later (eventually)

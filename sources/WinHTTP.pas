@@ -2,8 +2,8 @@ unit WinHTTP;
 
 interface
 
-uses
-  Windows,Dialogs;
+uses  Classes,
+  Windows;
 
 type
   HINTERNET = Pointer;
@@ -520,6 +520,122 @@ function WinHttpGet(const Url: String; out Response: AnsiString): Boolean;
 
 implementation
 
+
+function WinHttpGet(const Url: String; out Response: AnsiString): Boolean;
+var
+  hSession, hConnect, hRequest: HINTERNET;
+  uc: TUrlComponents;
+  Port: INTERNET_PORT;
+  Flags, Read, Avail: DWORD;
+  Buf: array[0..8191] of Byte; // 加大缓冲区，8KB更适合现代网络
+  HostBuf, PathBuf: array[0..511] of WideChar;
+  
+  CTypeBuf: array[0..511] of WideChar;
+  CTypeLen, Index: DWORD;
+  ContentType: String;
+  
+  MemStream: TMemoryStream; // 用于高效拼接网络流
+begin
+  Result := False;
+  Response := '';
+  
+  FillChar(uc, SizeOf(uc), 0);
+  uc.dwStructSize := SizeOf(uc);
+  uc.lpszHostName := @HostBuf;
+  uc.dwHostNameLength := Length(HostBuf);
+  uc.lpszUrlPath := @PathBuf;
+  uc.dwUrlPathLength := Length(PathBuf);
+
+  if not WinHttpCrackUrl(PWideChar(WideString(Url)), 0, 0, uc) then Exit;
+  
+  Port := uc.nPort;
+  if Port = 0 then
+  begin
+    if uc.nScheme = INTERNET_SCHEME_HTTPS then
+      Port := 443
+    else
+      Port := 80;
+  end;
+  
+  Flags := 0;
+  if uc.nScheme = INTERNET_SCHEME_HTTPS then
+    Flags := WINHTTP_FLAG_SECURE;
+
+  hSession := WinHttpOpen('WinHTTP/1.0', WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, nil, nil, 0);
+  if not Assigned(hSession) then Exit;
+
+  try
+    hConnect := WinHttpConnect(hSession, uc.lpszHostName, Port, 0);
+    if not Assigned(hConnect) then Exit;
+    try
+      hRequest := WinHttpOpenRequest(hConnect, 'GET', uc.lpszUrlPath, nil, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, Flags);
+      if not Assigned(hRequest) then Exit;
+      try
+        if WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) then
+        begin
+          if WinHttpReceiveResponse(hRequest, nil) then
+          begin
+            // ==========================================================
+            // 获取 Content-Type
+            // ==========================================================
+            FillChar(CTypeBuf, SizeOf(CTypeBuf), 0);
+            CTypeLen := SizeOf(CTypeBuf);
+            Index := 0;
+
+            // 注意这里：如果您的 WinHTTP 单元要求传递 PDWORD 指针，请将 Index 改为 @Index
+            if WinHttpQueryHeaders(
+              hRequest,
+              HTTP_QUERY_CONTENT_TYPE,
+              WINHTTP_HEADER_NAME_BY_INDEX, // nil
+              @CTypeBuf,
+              CTypeLen,
+              Index // 或 @Index，取决于头文件声明
+            ) then
+            begin
+              ContentType := String(CTypeBuf);
+              // 测试时可取消注释: ShowMessage('ContentType: ' + ContentType);
+            end;
+
+            // ==========================================================
+            // 高效读取数据体
+            // ==========================================================
+            MemStream := TMemoryStream.Create;
+            try
+              while WinHttpQueryDataAvailable(hRequest, Avail) and (Avail > 0) do
+              begin
+                // Avail 是系统建议的值，但保险起见，我们仍用缓冲区大小和 Avail 中较小的一个
+                Read := 0;
+                if WinHttpReadData(hRequest, @Buf, SizeOf(Buf), Read) then
+                begin
+                  if Read > 0 then
+                    MemStream.Write(Buf[0], Read);
+                end else
+                  Break; // 读取失败则跳出
+              end;
+              
+              // 【核心】一步到位分配和赋值给 AnsiString，零内存碎片，且保证二进制安全
+              if MemStream.Size > 0 then
+                SetString(Response, PAnsiChar(MemStream.Memory), MemStream.Size);
+                
+            finally
+              MemStream.Free;
+            end;
+
+            Result := True;
+          end;
+        end;
+      finally
+        WinHttpCloseHandle(hRequest);
+      end;
+    finally
+      WinHttpCloseHandle(hConnect);
+    end;
+  finally
+    WinHttpCloseHandle(hSession);
+  end;
+end;
+
+{
 function WinHttpGet(const Url: String; out Response: AnsiString): Boolean;
 var
   hSession, hConnect, hRequest: HINTERNET;
@@ -559,15 +675,20 @@ begin
   Flags := 0;
   if uc.nScheme = INTERNET_SCHEME_HTTPS then
     Flags := WINHTTP_FLAG_SECURE;
+  
 
   hSession := WinHttpOpen('WinHTTP/1.0', WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, nil, nil, 0);
   if not Assigned(hSession) then Exit;
+
+
   try
     hConnect := WinHttpConnect(hSession, uc.lpszHostName, Port, 0);
     if not Assigned(hConnect) then Exit;
     try
       hRequest := WinHttpOpenRequest(hConnect, 'GET', uc.lpszUrlPath,
         nil, nil, nil, Flags);
+
+
       if not Assigned(hRequest) then Exit;
       try
         if WinHttpSendRequest(hRequest, nil, 0, nil, 0, 0, 0) then
@@ -618,5 +739,5 @@ begin
     WinHttpCloseHandle(hSession);
   end;
 end;
-
+   }
 end.
